@@ -7,6 +7,10 @@ from onnxruntime.datasets import get_example
 example_model = get_example("sigmoid.onnx")
 sess = onnxruntime.InferenceSession(example_model)
 
+print(sess.get_providers())
+sess.set_providers(['CUDAExecutionProvider'])
+# session.set_providers(['CPUExecutionProvider'])
+
 # identify our input name and shape
 input_name = sess.get_inputs()[0].name
 print("Input name  :", input_name)

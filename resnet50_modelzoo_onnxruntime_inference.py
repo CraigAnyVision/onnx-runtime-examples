@@ -48,6 +48,10 @@ print('Loaded {} reference outputs successfully.'.format(test_data_num))
 # Run the model on the backend
 session = onnxruntime.InferenceSession('resnet50v2/resnet50v2.onnx', None)
 
+print(session.get_providers())
+session.set_providers(['CUDAExecutionProvider'])
+# session.set_providers(['CPUExecutionProvider'])
+
 # get the name of the first input of the model
 input_name = session.get_inputs()[0].name
 
@@ -124,6 +128,6 @@ print('============ Top 5 labels are: ============================')
 print(labels[sort_idx[:5]])
 print('===========================================================')
 
-plt.axis('off')
-plt.imshow(image)
-plt.show()
+# plt.axis('off')
+# plt.imshow(image)
+# plt.show()

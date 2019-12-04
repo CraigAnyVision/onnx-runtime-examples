@@ -1,0 +1,14 @@
+name: onnxruntime-gpu
+channels:
+- conda-forge
+dependencies:
+- python=3.6.2
+- cudatoolkit=10.0
+- cudnn
+- pip
+- matplotlib
+- Pillow
+- pip:
+  - onnxruntime-gpu
+  - numpy
+  - onnx

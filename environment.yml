@@ -1,0 +1,12 @@
+name: onnxruntime
+channels:
+- conda-forge
+dependencies:
+- python=3.6.2
+- pip
+- matplotlib
+- Pillow
+- pip:
+  - onnxruntime
+  - numpy
+  - onnx
