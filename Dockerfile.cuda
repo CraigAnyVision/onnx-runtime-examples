@@ -1,0 +1,20 @@
+# docker build -t onnx-gpu -f Dockerfile.cuda .
+# docker run -it -v $PWD:/onnx_tuts/ onnx-gpu
+
+FROM mcr.microsoft.com/azureml/onnxruntime:latest-cuda
+
+ARG VENV_DIR=/venvs/
+
+RUN mkdir $VENV_DIR;
+
+COPY requirements*.txt $VENV_DIR
+
+RUN set -eu; \
+    pip install virtualenv; \
+    cd $VENV_DIR; \
+    virtualenv gpu; \
+    . gpu/bin/activate; \
+    pip install -r requirements_gpu.txt; \
+    deactivate;
+
+WORKDIR /onnx_tuts/
