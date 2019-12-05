@@ -69,6 +69,4 @@ RUN set -eu; \
 # Clear up
 RUN rm -rf /home/build/
 
-USER debugger
-
 WORKDIR /onnx_tuts/

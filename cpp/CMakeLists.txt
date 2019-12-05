@@ -15,5 +15,7 @@ set(LIB_ONNX ${ONNX_ROOT}lib/libonnxruntime.so)
 
 include_directories(${ONNX_INC_DIR})
 
-add_executable(ort_squeezenet ort_squeezenet.cpp)
-target_link_libraries(ort_squeezenet ${LIB_ONNX})
+set(TARGET_NAME "ort_squeezenet")
+add_executable(${TARGET_NAME}  ort_squeezenet.cpp)
+target_link_libraries(${TARGET_NAME} ${LIB_ONNX})
+target_compile_options(${TARGET_NAME} PRIVATE -Wall -Wextra -pedantic)

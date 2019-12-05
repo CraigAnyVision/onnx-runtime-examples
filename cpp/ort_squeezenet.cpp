@@ -2,15 +2,17 @@
 // Licensed under the MIT License
 
 #include <cassert>
+#include <chrono>
+#include <iostream>
 #include <vector>
 
 #include <onnxruntime_cxx_api.h>
 #include <cuda_provider_factory.h>
 
-int main(int argc, char* argv[])
+int main(int argc, char**)
 {
 	//*************************************************************************
-	// initialize  enviroment...one enviroment per process
+	// initialize environment... one environment per process
 	// enviroment maintains thread pools and other state info
 	Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "test");
 
@@ -19,10 +21,17 @@ int main(int argc, char* argv[])
 
 	session_options.SetIntraOpNumThreads(1);
 
-	// If onnxruntime.dll is built with CUDA enabled, we can uncomment out this line to use CUDA for this
-	// session (we also need to include cuda_provider_factory.h above which defines it)
-
-	 OrtSessionOptionsAppendExecutionProvider_CUDA(session_options, 0);
+	if (argc > 1)
+    {
+        // If onnxruntime.dll is built with CUDA enabled, we can uncomment out this line to use CUDA for this
+	    // session (we also need to include cuda_provider_factory.h above which defines it)
+        printf("Using CUDA Execution Provider\n");
+        if(OrtSessionOptionsAppendExecutionProvider_CUDA(session_options, 0))
+        {
+            printf("ERROR: Failed to set CUDA runtime!\n");
+            exit(EXIT_FAILURE);
+        }
+    }
 
 	// Sets graph optimization level
 	// Available levels are
@@ -36,7 +45,7 @@ int main(int argc, char* argv[])
 	// create session and load model into memory
 	// using squeezenet version 1.3
 	// URL = https://github.com/onnx/models/tree/master/squeezenet
-	const char* model_path = "squeezenet.onnx";
+	const char* model_path = "../squeezenet.onnx";
 
 	printf("Using Onnxruntime C++ API\n");
 	Ort::Session session(env, model_path, session_options);
@@ -54,11 +63,11 @@ int main(int argc, char* argv[])
 	printf("Number of inputs = %zu\n", num_input_nodes);
 
 	// iterate over all input nodes
-	for (int i = 0; i < num_input_nodes; i++)
+	for (size_t i = 0; i < num_input_nodes; i++)
 	{
 		// print input node names
 		char* input_name = session.GetInputName(i, allocator);
-		printf("Input %d : name=%s\n", i, input_name);
+		printf("Input %lu : name=%s\n", i, input_name);
 		input_node_names[i] = input_name;
 
 		// print input node types
@@ -66,13 +75,15 @@ int main(int argc, char* argv[])
 		auto tensor_info = type_info.GetTensorTypeAndShapeInfo();
 
 		ONNXTensorElementDataType type = tensor_info.GetElementType();
-		printf("Input %d : type=%d\n", i, type);
+		printf("Input %lu : type=%d\n", i, type);
 
 		// print input shapes/dims
 		input_node_dims = tensor_info.GetShape();
-		printf("Input %d : num_dims=%zu\n", i, input_node_dims.size());
-		for (int j = 0; j < input_node_dims.size(); j++)
-			printf("Input %d : dim %d=%jd\n", i, j, input_node_dims[j]);
+		printf("Input %lu : num_dims=%zu\n", i, input_node_dims.size());
+		for (size_t j = 0; j < input_node_dims.size(); j++)
+		{
+			printf("Input %lu : dim %lu=%jd\n", i, j, input_node_dims[j]);
+		}
 	}
 
 	// Results should be...
@@ -99,9 +110,13 @@ int main(int argc, char* argv[])
 	std::vector<float> input_tensor_values(input_tensor_size);
 	std::vector<const char*> output_node_names = {"softmaxout_1"};
 
+	auto t1 = std::chrono::high_resolution_clock::now();
+
 	// initialize input data with values in [0.0, 1.0]
 	for (unsigned int i = 0; i < input_tensor_size; i++)
-		input_tensor_values[i] = (float)i / (input_tensor_size + 1);
+    {
+        input_tensor_values[i] = (float)i / (input_tensor_size + 1);
+    }
 
 	// create input tensor object from data values
 	auto memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
@@ -120,7 +135,14 @@ int main(int argc, char* argv[])
 
 	// score the model, and print scores for first 5 classes
 	for (int i = 0; i < 5; i++)
-		printf("Score for class [%d] =  %f\n", i, floatarr[i]);
+    {
+        printf("Score for class [%d] =  %f\n", i, floatarr[i]);
+    }
+
+    auto t2 = std::chrono::high_resolution_clock::now();
+
+    std::chrono::duration<double, std::milli> fp_ms = t2 - t1;
+    std::cout << "Infer took " << fp_ms.count() << " ms\n";
 
 	// Results should be as below...
 	// Score for class[0] = 0.000045
@@ -128,6 +150,4 @@ int main(int argc, char* argv[])
 	// Score for class[2] = 0.000125
 	// Score for class[3] = 0.001180
 	// Score for class[4] = 0.001317
-	printf("Done!\n");
-	return 0;
 }

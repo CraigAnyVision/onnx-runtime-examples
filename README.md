@@ -39,8 +39,12 @@ pip install -r requirements.txt
 
 ### Docker setup
 ```bash
+# Plain Docker
 docker build -t onnx-gpu -f Dockerfile.cuda .
 docker run -it -v $PWD:/onnx_tuts/ onnx-gpu
+
+# Docker Compose
+docker-compose up -d --build
 
 cd cpp
 mkdir bld && cd bld
