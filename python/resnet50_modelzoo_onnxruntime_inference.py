@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
 import os
+import os.path
+import sys
 import numpy as np  # we're going to use numpy to process input and output data
 import onnxruntime  # to inference ONNX models, we use the ONNX Runtime
 import onnx
 from onnx import numpy_helper
-# import urllib.request
 import json
 import time
 
@@ -13,15 +14,20 @@ import time
 import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
 
-## retrieve our model from the ONNX model zoo
-# onnx_model_url = "https://s3.amazonaws.com/onnx-model-zoo/resnet/resnet50v2/resnet50v2.tar.gz"
-# imagenet_labels_url = "https://raw.githubusercontent.com/anishathalye/imagenet-simple-labels/master/imagenet-simple-labels.json"
-# urllib.request.urlretrieve(onnx_model_url, filename="resnet50v2.tar.gz")
-# urllib.request.urlretrieve(imagenet_labels_url, filename="imagenet-simple-labels.json")
-# tar xvzf resnet50v2.tar.gz --warning=no-unknown-keyword
 
+labels_filename = "imagenet-simple-labels.json"
 test_data_dir = 'resnet50v2/test_data_set'
 test_data_num = 3
+
+if not os.path.isfile(labels_filename):
+    sys.stderr.write("Missing " + labels_filename + "\n")
+    sys.stderr.write("Run get_resnet.py\n")
+    sys.exit()
+
+if not os.path.isdir(test_data_dir + "_0"):
+    sys.stderr.write("Missing " + test_data_dir + "\n")
+    sys.stderr.write("Run get_resnet.py\n")
+    sys.exit()
 
 # Load inputs
 inputs = []
