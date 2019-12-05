@@ -4,3 +4,4 @@ venv/
 *.tar.gz
 *.onnx
 *.pb
+bld/

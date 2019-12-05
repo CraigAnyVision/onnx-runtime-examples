@@ -1,6 +1,6 @@
 # ONNX-Runtime examples
 
-## conda setup
+## Conda Setup
 ```bash
 conda env create --file environment-gpu.yml
 conda activate onnxruntime-gpu
@@ -13,7 +13,7 @@ conda deactivate
 conda env remove -n onnxruntime-gpu
 ```
 
-## pip Setup
+## Pip Setup
 Set python to python3 as default
 ```bash
 sudo ln -sfn /usr/bin/python3 /usr/bin/python
@@ -32,3 +32,8 @@ apt install python3-pip
 pip install -r requirements.txt
 ```
 
+## Docker setup
+```bash
+docker build -t onnx-gpu -f Dockerfile.cuda .
+docker run -it -v $PWD:/onnx_tuts/ onnx-gpu
+```

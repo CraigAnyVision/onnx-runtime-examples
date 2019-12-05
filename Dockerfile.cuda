@@ -1,20 +1,65 @@
-# docker build -t onnx-gpu -f Dockerfile.cuda .
-# docker run -it -v $PWD:/onnx_tuts/ onnx-gpu
-
 FROM mcr.microsoft.com/azureml/onnxruntime:latest-cuda
 
-ARG VENV_DIR=/venvs/
+WORKDIR /home/build/
 
-RUN mkdir $VENV_DIR;
+ARG TZ=Europe/Belfast
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-COPY requirements*.txt $VENV_DIR
+RUN apt-get update; \
+    apt-get upgrade -y; \
+    apt-get install -y \
+    build-essential \
+    pkg-config \
+    cmake \
+    gdb \
+    gdbserver \
+    git \
+    valgrind \
+    nano \
+    vim \
+    openssh-server \
+    lsb-release \
+    wget \
+    curl \
+    axel \
+    zip \
+    unzip \
+    cpio \
+    tree \
+    libgtk2.0-dev \
+    libopencv-dev \
+    libboost-all-dev \
+    libgflags-dev \
+    libgoogle-glog-dev \
+    rsync;
 
+# Enable remote debugging
 RUN set -eu; \
-    pip install virtualenv; \
-    cd $VENV_DIR; \
-    virtualenv gpu; \
-    . gpu/bin/activate; \
-    pip install -r requirements_gpu.txt; \
-    deactivate;
+    mkdir /var/run/sshd; \
+    echo 'root:root' | chpasswd; \
+    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config; \
+    sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd; \
+    useradd -ms /bin/bash debugger; \
+    echo 'debugger:pwd' | chpasswd;
+
+ARG CMAKE_VERSION="3.16.0"
+RUN set -eux; \
+    axel "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}.tar.gz"; \
+    tar xf "cmake-${CMAKE_VERSION}.tar.gz"; \
+    cd "cmake-${CMAKE_VERSION}"; \
+    cmake .; \
+    make -j $(nproc) install;
+
+RUN set -eux; \
+    axel https://github.com/microsoft/onnxruntime/releases/download/v1.0.0/onnxruntime-linux-x64-1.0.0.tgz; \
+    pwd; \
+    tar xvf onnxruntime-linux-x64-1.0.0.tgz; \
+    mv onnxruntime-linux-x64-1.0.0/ /opt/; \
+    ln -s /opt/onnxruntime-linux-x64-1.0.0/ /opt/onnxruntime;
+
+# Clear up
+RUN rm -rf /home/build/
+
+USER debugger
 
 WORKDIR /onnx_tuts/
