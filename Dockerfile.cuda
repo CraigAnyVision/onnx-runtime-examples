@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/azureml/onnxruntime:latest-cuda
+FROM nvidia/cuda:10.0-cudnn7-devel
 
 WORKDIR /home/build/
 
@@ -31,6 +31,7 @@ RUN apt-get update; \
     libboost-all-dev \
     libgflags-dev \
     libgoogle-glog-dev \
+    libssl-dev \
     rsync;
 
 # Enable remote debugging
@@ -42,20 +43,28 @@ RUN set -eu; \
     useradd -ms /bin/bash debugger; \
     echo 'debugger:pwd' | chpasswd;
 
+# 22 for ssh server, 7777 for gdb server
+EXPOSE 22 7777
+
 ARG CMAKE_VERSION="3.16.0"
-RUN set -eux; \
+RUN set -eu; \
     axel "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}.tar.gz"; \
     tar xf "cmake-${CMAKE_VERSION}.tar.gz"; \
     cd "cmake-${CMAKE_VERSION}"; \
     cmake .; \
     make -j $(nproc) install;
 
-RUN set -eux; \
+RUN set -eu; \
     axel https://github.com/microsoft/onnxruntime/releases/download/v1.0.0/onnxruntime-linux-x64-1.0.0.tgz; \
-    pwd; \
     tar xvf onnxruntime-linux-x64-1.0.0.tgz; \
     mv onnxruntime-linux-x64-1.0.0/ /opt/; \
-    ln -s /opt/onnxruntime-linux-x64-1.0.0/ /opt/onnxruntime;
+    ln -s /opt/onnxruntime-linux-x64-1.0.0 /opt/onnxruntime;
+
+RUN set -eu; \
+    axel https://github.com/microsoft/onnxruntime/releases/download/v1.0.0/onnxruntime-linux-x64-gpu-1.0.0.tgz; \
+    tar xvf onnxruntime-linux-x64-gpu-1.0.0.tgz; \
+    mv onnxruntime-linux-x64-gpu-1.0.0/ /opt/; \
+    ln -s /opt/onnxruntime-linux-x64-gpu-1.0.0 /opt/onnxruntime-gpu;
 
 # Clear up
 RUN rm -rf /home/build/

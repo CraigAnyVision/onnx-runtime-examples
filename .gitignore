@@ -4,4 +4,5 @@ venv/
 *.tar.gz
 *.onnx
 *.pb
-bld/
+bld*/
+cmake-build-*
