@@ -1,16 +1,40 @@
 // Copyright(c) Microsoft Corporation.All rights reserved.
 // Licensed under the MIT License
 
+#include <unistd.h>
+#include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <iostream>
+#include <numeric>
 #include <vector>
 
-#include <onnxruntime_cxx_api.h>
 #include <cuda_provider_factory.h>
+#include <onnxruntime_cxx_api.h>
 
-int main(int argc, char**)
+int main(int argc, char** argv)
 {
+	size_t num_iters = 1;
+	bool use_cuda = false;
+
+	int c;
+	while ((c = getopt(argc, argv, "ci:")) != -1)
+	{
+		switch (c)
+		{
+			case 'c':
+				use_cuda = true;
+				break;
+			case 'i':
+				num_iters = std::stoi(optarg);
+				break;
+			case '?':
+			default:
+				std::cerr << "Unexpected input\n";
+				exit(EXIT_FAILURE);
+		}
+	}
+
 	//*************************************************************************
 	// initialize environment... one environment per process
 	// enviroment maintains thread pools and other state info
@@ -21,17 +45,17 @@ int main(int argc, char**)
 
 	session_options.SetIntraOpNumThreads(1);
 
-	if (argc > 1)
-    {
-        // If onnxruntime.dll is built with CUDA enabled, we can uncomment out this line to use CUDA for this
-	    // session (we also need to include cuda_provider_factory.h above which defines it)
-        printf("Using CUDA Execution Provider\n");
-        if(OrtSessionOptionsAppendExecutionProvider_CUDA(session_options, 0))
-        {
-            printf("ERROR: Failed to set CUDA runtime!\n");
-            exit(EXIT_FAILURE);
-        }
-    }
+	if (use_cuda)
+	{
+		// If onnxruntime.dll is built with CUDA enabled, we can uncomment out this line to use CUDA for this
+		// session (we also need to include cuda_provider_factory.h above which defines it)
+		printf("Using CUDA Execution Provider\n");
+		if (OrtSessionOptionsAppendExecutionProvider_CUDA(session_options, 0))
+		{
+			printf("ERROR: Failed to set CUDA runtime!\n");
+			exit(EXIT_FAILURE);
+		}
+	}
 
 	// Sets graph optimization level
 	// Available levels are
@@ -110,44 +134,52 @@ int main(int argc, char**)
 	std::vector<float> input_tensor_values(input_tensor_size);
 	std::vector<const char*> output_node_names = {"softmaxout_1"};
 
-	auto t1 = std::chrono::high_resolution_clock::now();
+	std::vector<float> runtimes(num_iters);
 
-	// initialize input data with values in [0.0, 1.0]
-	for (unsigned int i = 0; i < input_tensor_size; i++)
-    {
-        input_tensor_values[i] = (float)i / (input_tensor_size + 1);
-    }
+	// Score for each class should be as below...
+	std::array<float, 5> ground_truths{0.000045, 0.003846, 0.000125, 0.001180, 0.001317};
 
-	// create input tensor object from data values
-	auto memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
-	Ort::Value input_tensor = Ort::Value::CreateTensor<float>(memory_info, input_tensor_values.data(),
-	                                                          input_tensor_size, input_node_dims.data(), 4);
-	assert(input_tensor.IsTensor());
+	for (size_t it = 0; it < num_iters; ++it)
+	{
+		auto t1 = std::chrono::high_resolution_clock::now();
 
-	// score model & input tensor, get back output tensor
-	auto output_tensors =
-	    session.Run(Ort::RunOptions{nullptr}, input_node_names.data(), &input_tensor, 1, output_node_names.data(), 1);
-	assert(output_tensors.size() == 1 && output_tensors.front().IsTensor());
+		// initialize input data with values in [0.0, 1.0]
+		for (unsigned int i = 0; i < input_tensor_size; i++)
+		{
+			input_tensor_values[i] = (float)i / (input_tensor_size + 1);
+		}
 
-	// Get pointer to output tensor float values
-	float* floatarr = output_tensors.front().GetTensorMutableData<float>();
-	assert(abs(floatarr[0] - 0.000045) < 1e-6);
+		// create input tensor object from data values
+		auto memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
+		Ort::Value input_tensor = Ort::Value::CreateTensor<float>(memory_info, input_tensor_values.data(),
+		                                                          input_tensor_size, input_node_dims.data(), 4);
+		assert(input_tensor.IsTensor());
 
-	// score the model, and print scores for first 5 classes
-	for (int i = 0; i < 5; i++)
-    {
-        printf("Score for class [%d] =  %f\n", i, floatarr[i]);
-    }
+		// score model & input tensor, get back output tensor
+		auto output_tensors = session.Run(Ort::RunOptions{nullptr}, input_node_names.data(), &input_tensor, 1,
+		                                  output_node_names.data(), 1);
+		assert(output_tensors.size() == 1 && output_tensors.front().IsTensor());
 
-    auto t2 = std::chrono::high_resolution_clock::now();
+		// Get pointer to output tensor float values
+		float* floatarr = output_tensors.front().GetTensorMutableData<float>();
+		assert(abs(floatarr[0] - 0.000045) < 1e-6);
 
-    std::chrono::duration<double, std::milli> fp_ms = t2 - t1;
-    std::cout << "Infer took " << fp_ms.count() << " ms\n";
+		// score the model, and check scores for first 5 classes
+		for (int i = 0; i < 5; i++)
+		{
+			assert(std::abs(floatarr[i] - ground_truths[i]) < 0.001f);
+		}
 
-	// Results should be as below...
-	// Score for class[0] = 0.000045
-	// Score for class[1] = 0.003846
-	// Score for class[2] = 0.000125
-	// Score for class[3] = 0.001180
-	// Score for class[4] = 0.001317
+		auto t2 = std::chrono::high_resolution_clock::now();
+
+		std::chrono::duration<double, std::milli> fp_ms = t2 - t1;
+		runtimes[it] = fp_ms.count();
+	}
+
+	float total_infer_time = std::accumulate(runtimes.begin(), runtimes.end(), 0.0f);
+
+	std::cout << "Total infer runtime: " << total_infer_time << "ms\n";
+	std::cout << "Max infer runtime: " << *std::max_element(runtimes.begin(), runtimes.end()) << "ms\n";
+	std::cout << "Min infer runtime: " << *std::min_element(runtimes.begin(), runtimes.end()) << "ms\n";
+	std::cout << "Average runtime per inference: " << total_infer_time / num_iters << "ms\n";
 }
