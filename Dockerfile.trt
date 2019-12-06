@@ -1,4 +1,4 @@
-FROM nvidia/cuda:10.0-cudnn7-devel
+FROM mcr.microsoft.com/azureml/onnxruntime:latest-tensorrt
 
 WORKDIR /home/build/
 
@@ -54,17 +54,23 @@ RUN set -eu; \
     cmake .; \
     make -j $(nproc) install;
 
-RUN set -eu; \
-    axel https://github.com/microsoft/onnxruntime/releases/download/v1.0.0/onnxruntime-linux-x64-1.0.0.tgz; \
-    tar xvf onnxruntime-linux-x64-1.0.0.tgz; \
-    mv onnxruntime-linux-x64-1.0.0/ /opt/; \
-    ln -s /opt/onnxruntime-linux-x64-1.0.0 /opt/onnxruntime;
+ARG ONNXRUNTIME_REPO=https://github.com/Microsoft/onnxruntime
+ARG ONNXRUNTIME_BRANCH=master
+RUN set -eux; \
+	git clone --single-branch --branch ${ONNXRUNTIME_BRANCH} --recursive ${ONNXRUNTIME_REPO} onnxruntime; \
+	mkdir -p /code/; \
+	cp onnxruntime/docs/Privacy.md /code/Privacy.md; \
+    cp onnxruntime/dockerfiles/LICENSE-IMAGE.txt /code/LICENSE-IMAGE.txt; \
+    cp onnxruntime/ThirdPartyNotices.txt /code/ThirdPartyNotices.txt;
 
-RUN set -eu; \
-    axel https://github.com/microsoft/onnxruntime/releases/download/v1.0.0/onnxruntime-linux-x64-gpu-1.0.0.tgz; \
-    tar xvf onnxruntime-linux-x64-gpu-1.0.0.tgz; \
-    mv onnxruntime-linux-x64-gpu-1.0.0/ /opt/; \
-    ln -s /opt/onnxruntime-linux-x64-gpu-1.0.0 /opt/onnxruntime-gpu;
+RUN set -eux; \
+    cd onnxruntime/; \
+    ./build.sh --cuda_home /usr/local/cuda --cudnn_home /usr/lib/x86_64-linux-gnu/ --use_tensorrt --tensorrt_home /workspace/tensorrt --config Release --build_wheel --update --build --build_shared_lib --cmake_extra_defines ONNXRUNTIME_VERSION=$(cat ./VERSION_NUMBER);
+
+RUN set -eux; \
+    cd onnxruntime/build/Linux/Release/; \
+    cmake . -DCMAKE_INSTALL_PREFIX=/opt/onnxruntime-trt/; \
+    make install -j $(nproc);
 
 # Clear up
 RUN rm -rf /home/build/

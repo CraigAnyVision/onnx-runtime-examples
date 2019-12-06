@@ -7,23 +7,24 @@
 #include <chrono>
 #include <iostream>
 #include <numeric>
+#include <tuple>
 #include <vector>
 
-#include <cuda_provider_factory.h>
 #include <onnxruntime_cxx_api.h>
+#include <tensorrt_provider_factory.h>
 
 int main(int argc, char** argv)
 {
 	size_t num_iters = 1;
-	bool use_cuda = false;
+	bool use_trt = false;
 
 	int c;
-	while ((c = getopt(argc, argv, "ci:")) != -1)
+	while ((c = getopt(argc, argv, "ti:")) != -1)
 	{
 		switch (c)
 		{
-			case 'c':
-				use_cuda = true;
+			case 't':
+				use_trt = true;
 				break;
 			case 'i':
 				num_iters = std::stoi(optarg);
@@ -45,14 +46,14 @@ int main(int argc, char** argv)
 
 	session_options.SetIntraOpNumThreads(1);
 
-	if (use_cuda)
+	if (use_trt)
 	{
-		// If onnxruntime.dll is built with CUDA enabled, we can uncomment out this line to use CUDA for this
-		// session (we also need to include cuda_provider_factory.h above which defines it)
-		printf("Using CUDA Execution Provider\n");
-		if (OrtSessionOptionsAppendExecutionProvider_CUDA(session_options, 0))
+		// If onnxruntime.dll is built with TRT enabled, we can uncomment out this line to use TRT for this
+		// session (we also need to include tensorrt_provider_factory.h above which defines it)
+		printf("Using TRT Execution Provider\n");
+		if (OrtSessionOptionsAppendExecutionProvider_Tensorrt(session_options, 0))
 		{
-			printf("ERROR: Failed to set CUDA runtime!\n");
+			printf("ERROR: Failed to set TRT runtime!\n");
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -167,6 +168,8 @@ int main(int argc, char** argv)
 		// score the model, and check scores for first 5 classes
 		for (int i = 0; i < 5; i++)
 		{
+			std::ignore = floatarr;
+			std::ignore = ground_truths;
 			assert(std::abs(floatarr[i] - ground_truths[i]) < 0.001f);
 		}
 
